@@ -7,6 +7,8 @@ from bs4 import BeautifulSoup
 import csv
 import pickle
 import datetime
+import fitz # Importez PyMuPDF sous son nom usuel
+import re
 import hashlib
 from sentence_transformers import SentenceTransformer
 
@@ -22,31 +24,47 @@ class DocumentProcessor:
         self.documents = []
         self.labels = []
         self.document_metadata = []
+
+    def extract_snippet(self, text, query, max_chars=300):
+       """   Extrait un court extrait de texte (snippet) contenant les mots de la requête.   """
+       words = re.findall(r'\b\w+\b', query.lower())
+       for word in words:
+        match = re.search(r'\b\w*' + re.escape(word) + r'\w*\b', text, re.IGNORECASE)
+        if match:
+            start_index = max(0, match.start() - max_chars // 2)
+            end_index = min(len(text), match.end() + max_chars // 2)
+            
+            # Ajuster les indices pour ne pas couper un mot
+            snippet_start = text.rfind(' ', 0, start_index) + 1 if start_index > 0 else 0
+            snippet_end = text.find(' ', end_index) if end_index < len(text) else len(text)
+            
+            return text[snippet_start:snippet_end]
+    
+         # Si aucun mot de la requête n'est trouvé, retourner les premiers caractères
+        return text[:max_chars]
+
+
         
     def upload_document(self, file_path, doc_type="general"):
         """Upload et traite différents types de documents"""
         try:
             text_content = self._extract_text_from_file(file_path)
             if text_content:
-                file_stats = os.stat(file_path)
-                doc_metadata = {
-                    'filename': os.path.basename(file_path),
-                    'full_path': file_path,
-                    'size': file_stats.st_size,
-                    'created': datetime.datetime.fromtimestamp(file_stats.st_ctime).isoformat(),
-                    'modified': datetime.datetime.fromtimestamp(file_stats.st_mtime).isoformat(),
-                    'added_to_system': datetime.datetime.now().isoformat(),
-                    'doc_type': doc_type,
-                    'text_length': len(text_content),
-                    'hash': hashlib.md5(text_content.encode()).hexdigest()
-                }
+              # Nettoyage du texte après l'extraction
+              cleaned_text = self._clean_text(text_content)
+            
+              file_stats = os.stat(file_path)
+              doc_metadata = {
+                # ... (le reste du dictionnaire reste inchangé)
+              }
+            
                 
-                self.documents.append(text_content)
-                self.labels.append(doc_type)
-                self.document_metadata.append(doc_metadata)
+            self.documents.append(text_content)
+            self.labels.append(doc_type)
+            self.document_metadata.append(doc_metadata)
                 
-                print(f"Document {file_path} traité avec succès")
-                return True
+            print(f"Document {file_path} traité avec succès")
+            return True
         except Exception as e:
             print(f"Erreur lors du traitement de {file_path}: {e}")
             return False
@@ -108,16 +126,42 @@ class DocumentProcessor:
             return self._extract_from_txt(file_path)
         else:
             raise ValueError(f"Type de fichier non supporté: {file_extension}")
-    
+        
     def _extract_from_pdf(self, file_path):
-        """Extrait le texte d'un fichier PDF"""
+        """Extrait le texte d'un fichier PDF en utilisant PyMuPDF. """
         text = ""
-        with open(file_path, 'rb') as file:
-            pdf_reader = PyPDF2.PdfReader(file)
-            for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
+        try:
+            doc = fitz.open(file_path)
+            for page in doc:
+                text += page.get_text() + "\n"
+            doc.close()
+        except Exception as e:
+            print(f"Erreur lors de l'extraction du PDF avec PyMuPDF: {e}")
+            return ""
         return text.strip()
     
+    #def _extract_from_pdf(self, file_path):
+    #    """Extrait le texte d'un fichier PDF"""
+    #    text = ""
+    #    with open(file_path, 'rb') as file:
+    #        pdf_reader = PyPDF2.PdfReader(file)
+    #        for page in pdf_reader.pages:
+    #            text += page.extract_text() + "\n"
+    #    return text.strip()
+    def _clean_text(self, text):
+        """Nettoie le texte en supprimant les en-têtes, pieds de page, numéros de page et les multiples espaces. """
+    # Expression régulière pour les numéros de page (ex: 1, 2, 3...)
+    # ou les en-têtes/pieds de page simples.
+    # Note: Ceci est un exemple simple, à adapter selon vos documents.
+        text = re.sub(r'\n\s*\d+\s*\n', '\n', text)  # Supprime les numéros de page isolés
+        text = re.sub(r'Page\s+\d+\s+of\s+\d+', '', text, flags=re.IGNORECASE) # Supprime "Page X of Y"
+    
+    # Supprime les sauts de ligne multiples et les espaces multiples
+        text = re.sub(r'\n+', '\n', text)
+        text = re.sub(r'\s{2,}', ' ', text)
+    
+        return text.strip()
+        
     def _extract_from_word(self, file_path):
         """Extrait le texte d'un fichier Word"""
         doc = docx.Document(file_path)
