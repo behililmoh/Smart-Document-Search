@@ -1,0 +1,9 @@
+hnswlib
+numpy
+pandas
+scikit-learn
+sentence-transformers
+PyPDF2
+python-docx
+beautifulsoup4
+openpyxl
