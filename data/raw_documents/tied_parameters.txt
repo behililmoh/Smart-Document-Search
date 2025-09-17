@@ -1,0 +1,9 @@
+Tied Parameters in neural networks refer to weight sharing between different layers or components. This technique reduces model complexity and prevents overfitting by constraining certain weights to have identical values.
+
+In practice, tied parameters are commonly used in:
+- Autoencoders (encoder and decoder weights)
+- Siamese networks (shared feature extractors)  
+- Recurrent neural networks (time-step weight sharing)
+- Convolutional layers (filter weight sharing)
+
+Benefits include reduced memory usage, faster training, and better generalization.
