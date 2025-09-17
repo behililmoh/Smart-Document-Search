@@ -1,6 +1,3 @@
-Voici une version mise à jour du fichier `README.md` qui intègre toutes les améliorations que nous avons discutées, y compris la nouvelle interface web avec Streamlit, l'ajout incrémental de documents, l'amélioration de l'extraction de texte et l'affichage des extraits.
-
------
 
 # 🔎 **Smart Document Search**
 
